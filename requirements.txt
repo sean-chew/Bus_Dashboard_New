@@ -1,6 +1,3 @@
 streamlit
-pandas
-numpy
-urllib.request
-urllib.parse
-json
+pandas==2.2.3
+numpy==2.2.1
