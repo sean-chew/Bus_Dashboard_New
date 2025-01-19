@@ -21,7 +21,7 @@ from folium import plugins
 import matplotlib.pyplot as plt
 import seaborn as sns # visualization styling package
 import branca  # For color gradient
-%matplotlib inline 
+# matplotlib inline 
 
 def fetch_bus_data(route_id= None, date_start = None, date_end = None,borough = None, limit=1000):
     # Define API endpoint and base query
