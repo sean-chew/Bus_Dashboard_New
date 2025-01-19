@@ -1,0 +1,6 @@
+streamlit
+pandas
+numpy
+urllib.request
+urllib.parse
+json

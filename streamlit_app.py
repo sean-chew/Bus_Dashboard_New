@@ -5,10 +5,10 @@ warnings.filterwarnings("ignore")
 # We will use Pandas, Numpy, and Matplotlib which is a package for visualization with Python
 import pandas as pd
 #pd.set_option('display.max_rows',1000)
-import numpy as np
-import geopandas as gpd
-from datetime import datetime
-from geodatasets import get_path
+# import numpy as np
+# import geopandas as gpd
+# from datetime import datetime
+# from geodatasets import get_path
 
 # This is a library for accessing and parsing data through URLs
 import urllib.request, json 
@@ -16,11 +16,11 @@ import urllib.parse
 from urllib.parse import urlencode
 
 # Using folium to create a map
-import folium
-from folium import plugins
-import matplotlib.pyplot as plt
-import seaborn as sns # visualization styling package
-import branca  # For color gradient
+# import folium
+# from folium import plugins
+# import matplotlib.pyplot as plt
+# import seaborn as sns # visualization styling package
+# import branca  # For color gradient
 # matplotlib inline 
 
 def fetch_bus_data(route_id= None, date_start = None, date_end = None,borough = None, limit=1000):
