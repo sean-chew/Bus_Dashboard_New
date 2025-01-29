@@ -116,3 +116,4 @@ if st.sidebar.button("Fetch Data"):
         st.error(f"An error occurred: {str(e)}")
 else:
     st.info("Use the filters in the sidebar and click 'Fetch Data' to load bus data.")
+
