@@ -1,55 +1,118 @@
-# To ignore unimporant system warnings
+import streamlit as st
+import pandas as pd
+import urllib.request
+import json
+from urllib.parse import urlencode
 import warnings
 warnings.filterwarnings("ignore")
 
-# We will use Pandas, Numpy, and Matplotlib which is a package for visualization with Python
-import pandas as pd
-#pd.set_option('display.max_rows',1000)
-# import numpy as np
-# import geopandas as gpd
-# from datetime import datetime
-# from geodatasets import get_path
-
-# This is a library for accessing and parsing data through URLs
-import urllib.request, json 
-import urllib.parse
-from urllib.parse import urlencode
-
-# Using folium to create a map
-# import folium
-# from folium import plugins
-# import matplotlib.pyplot as plt
-# import seaborn as sns # visualization styling package
-# import branca  # For color gradient
-# matplotlib inline 
-
-def fetch_bus_data(route_id= None, date_start = None, date_end = None,borough = None, limit=1000):
+def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, limit=1000):
     # Define API endpoint and base query
     BASE_API = "https://data.ny.gov/resource/58t6-89vi.json?"
     query_speeds = {
         '$select': 'route_id, direction, AVG(average_road_speed) as avg_speed',
         '$group': 'route_id, direction',
         '$limit': limit,
-        '$order': 'avg_speed'  # Order by timestamp,
+        '$order': 'avg_speed'
     }
+    
+    # Build WHERE clause based on filters
+    where_conditions = []
+    
+    if route_id:
+        where_conditions.append(f'route_id="{route_id}"')
+    if borough:
+        where_conditions.append(f'borough="{borough}"')
+    if date_start:
+        where_conditions.append(f'timestamp>="{date_start}T00:00:00"')
+    if date_end:
+        where_conditions.append(f'timestamp<="{date_end}T23:59:59"')
+    
+    if where_conditions:
+        query_speeds['$where'] = ' AND '.join(where_conditions)
+    
     # Fetch data
     url_speeds = BASE_API + urlencode(query_speeds)
     response_speeds = urllib.request.urlopen(url_speeds)
     data_speeds = json.loads(response_speeds.read().decode())
     
-    # Only add WHERE clause if route_id is specified
-    if route_id:
-        query_speeds['$where'] = f'route_id="{route_id}"'
-    if borough:
-        query_speeds['$where'] = f'borough="{borough}"'
-    if date_start:
-        query_speeds['$where'] = f'timestamp=">={date_start}T00:00:00"'
-    if date_end:
-        query_speeds['$where'] = f'timestamp=">={date_end}T00:00:00"'
     # Convert to DataFrame
     df_speeds = pd.DataFrame(data_speeds)
     return df_speeds
 
-# Example usage
-df = fetch_bus_data(limit=100)
-df
+# Set up the Streamlit page
+st.set_page_config(page_title="NYC Bus Data Explorer", layout="wide")
+st.title("NYC Bus Data Explorer")
+
+# Sidebar controls
+st.sidebar.header("Filters")
+
+# Date range selector
+col1, col2 = st.sidebar.columns(2)
+with col1:
+    date_start = st.date_input("Start Date")
+with col2:
+    date_end = st.date_input("End Date")
+
+# Borough selector
+boroughs = ["All", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
+selected_borough = st.sidebar.selectbox("Select Borough", boroughs)
+
+# Convert borough "All" to None for the API
+borough_filter = None if selected_borough == "All" else selected_borough
+
+# Number of results limiter
+limit = st.sidebar.slider("Number of results", min_value=10, max_value=1000, value=100, step=10)
+
+# Add a button to trigger the data fetch
+if st.sidebar.button("Fetch Data"):
+    try:
+        # Convert dates to string format for API
+        date_start_str = date_start.strftime('%Y-%m-%d') if date_start else None
+        date_end_str = date_end.strftime('%Y-%m-%d') if date_end else None
+        
+        # Fetch the data
+        df = fetch_bus_data(
+            date_start=date_start_str,
+            date_end=date_end_str,
+            borough=borough_filter,
+            limit=limit
+        )
+        
+        # Display the results
+        st.header("Results")
+        
+        # Convert avg_speed to numeric and round to 2 decimal places
+        if 'avg_speed' in df.columns:
+            df['avg_speed'] = pd.to_numeric(df['avg_speed']).round(2)
+        
+        # Display basic statistics
+        if not df.empty:
+            st.subheader("Summary Statistics")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Average Speed", f"{df['avg_speed'].mean():.2f} mph")
+            with col2:
+                st.metric("Fastest Route", f"Route {df.loc[df['avg_speed'].idxmax(), 'route_id']}")
+            with col3:
+                st.metric("Slowest Route", f"Route {df.loc[df['avg_speed'].idxmin(), 'route_id']}")
+            
+            # Display the full dataset
+            st.subheader("Detailed Data")
+            st.dataframe(df)
+            
+            # Download button for the data
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="Download Data as CSV",
+                data=csv,
+                file_name="bus_data.csv",
+                mime="text/csv"
+            )
+        else:
+            st.warning("No data found for the selected filters.")
+            
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+else:
+    st.info("Use the filters in the sidebar and click 'Fetch Data' to load bus data.")
