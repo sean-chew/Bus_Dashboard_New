@@ -10,7 +10,7 @@ def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, 
     # Define API endpoint and base query
     BASE_API = "https://data.ny.gov/resource/58t6-89vi.json?"
     query_speeds = {
-        '$select': 'route_id, direction, AVG(average_road_speed) as avg_speed',
+        '$select': 'route_id, AVG(average_road_speed) as avg_speed',
         '$group': 'route_id',
         '$limit': limit,
         '$order': 'avg_speed'
