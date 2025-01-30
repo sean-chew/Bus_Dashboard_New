@@ -50,7 +50,7 @@ def fetch_and_extract_gtfs(url):
 df_shapes, df_trips = fetch_and_extract_gtfs(url)
 df_trips
 
-df_shapes['shape_pt_sequence'] = pd.to_numeric(shapes['shape_pt_sequence'])
+df_shapes['shape_pt_sequence'] = pd.to_numeric(df_shapes['shape_pt_sequence'])
 
 # Sort data to ensure points are in correct order
 df_shapes = df_shapes.sort_values(by=['shape_id', 'shape_pt_sequence'])
