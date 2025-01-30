@@ -180,7 +180,7 @@ if st.sidebar.button("Fetch Data"):
                     color="blue",  # You can map this to the route_id or avg_speed if needed
                     weight=3,
                     opacity=0.7,
-                    popup=row['route_name']
+                    popup=row['route_id']
                 ).add_to(folium_map)
 
             # Display the map in Streamlit
