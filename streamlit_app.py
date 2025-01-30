@@ -174,16 +174,16 @@ if st.sidebar.button("Fetch Data"):
             folium_map = folium.Map(location=[map_center.y, map_center.x], zoom_start=12)
 
             # Add routes to the map as lines
-            for _, row in gdf_routes.iterrows():
-                folium.PolyLine(
-                    locations=[(lat, lon) for lon, lat in row.geometry.coords],
-                    color="blue",  # You can map this to the route_id or avg_speed if needed
-                    weight=3,
-                    opacity=0.7
-                ).add_to(folium_map)
+            # for _, row in gdf_routes.iterrows():
+            #     folium.PolyLine(
+            #         locations=[(lat, lon) for lon, lat in row.geometry.coords],
+            #         color="blue",  # You can map this to the route_id or avg_speed if needed
+            #         weight=3,
+            #         opacity=0.7
+            #     ).add_to(folium_map)
 
             # Display the map in Streamlit
-            st.write(folium_map)
+            # st.write(folium_map)
         else:
             st.warning("No data found for the selected filters.")
             
