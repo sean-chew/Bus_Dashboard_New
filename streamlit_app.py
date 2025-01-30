@@ -28,9 +28,6 @@ def fetch_and_extract_gtfs(url):
         
         # Extract the ZIP file in memory
         with zipfile.ZipFile(zip_file, 'r') as zip_ref:
-            # List all files in the ZIP
-            # zip_ref.printdir()
-
             # Read 'shapes.txt' into DataFrame
             with zip_ref.open('shapes.txt') as f_shapes:
                 df_shapes = pd.read_csv(f_shapes)
@@ -59,7 +56,42 @@ lines = df_shapes.groupby('shape_id').apply(
 gdf = gpd.GeoDataFrame(lines, geometry='geometry', crs="EPSG:4326")  # WGS 84 CRS
 gdf_join = gdf.merge(df_trips, on='shape_id', how='left')
 
-# Streamlit page setup
+# Function to fetch bus data
+def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, limit=1000):
+    # Define API endpoint and base query
+    BASE_API = "https://data.ny.gov/resource/58t6-89vi.json?"
+    query_speeds = {
+        '$select': 'route_id, AVG(average_road_speed) as avg_speed',
+        '$group': 'route_id',
+        '$limit': limit,
+        '$order': 'avg_speed'
+    }
+    
+    # Build WHERE clause based on filters
+    where_conditions = []
+    
+    if route_id:
+        where_conditions.append(f'route_id="{route_id}"')
+    if borough:
+        where_conditions.append(f'borough="{borough}"')
+    if date_start:
+        where_conditions.append(f'timestamp>="{date_start}T00:00:00"')
+    if date_end:
+        where_conditions.append(f'timestamp<="{date_end}T23:59:59"')
+    
+    if where_conditions:
+        query_speeds['$where'] = ' AND '.join(where_conditions)
+    
+    # Fetch data
+    url_speeds = BASE_API + urlencode(query_speeds)
+    response_speeds = urllib.request.urlopen(url_speeds)
+    data_speeds = json.loads(response_speeds.read().decode())
+    
+    # Convert to DataFrame
+    df_speeds = pd.DataFrame(data_speeds)
+    return df_speeds
+
+# Set up the Streamlit page
 st.set_page_config(page_title="NYC Bus Data Explorer", layout="wide")
 st.title("NYC Bus Data Explorer")
 
