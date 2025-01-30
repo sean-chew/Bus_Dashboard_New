@@ -9,6 +9,7 @@ import warnings
 import geopandas as gpd
 import io
 import folium 
+import shapely as sp
 warnings.filterwarnings("ignore")
 # URL to the GTFS data
 url = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_b.zip"
