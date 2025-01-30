@@ -113,7 +113,7 @@ if st.sidebar.button("Fetch Data"):
             )
 
             st.subheader("Map Visualization")
-            gdf_routes = gpd.read_file("gdf_join.shp")  # Replace with your actual data source
+            gdf_routes = gpd.read_file("./gdf_join.shp")  # Replace with your actual data source
             map_center = gdf_routes.geometry.centroid.unary_union.centroid
             folium_map = folium.Map(location=[map_center.y, map_center.x], zoom_start=12)
 
