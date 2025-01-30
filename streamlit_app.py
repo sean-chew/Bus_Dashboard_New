@@ -49,7 +49,7 @@ def fetch_and_extract_gtfs(url):
 
 # Fetch and display stops data
 df_shapes, df_trips = fetch_and_extract_gtfs(url)
-df_trips
+# df_trips
 
 df_shapes['shape_pt_sequence'] = pd.to_numeric(df_shapes['shape_pt_sequence'])
 
@@ -62,7 +62,7 @@ lines = df_shapes.groupby('shape_id').apply(
 
 # # Convert to GeoDataFrame
 gdf = gpd.GeoDataFrame(lines, geometry='geometry', crs="EPSG:4326")  # WGS 84 CRS
-gdf_join = gdf.merge(trips_c, on = 'shape_id',how='left')
+gdf_join = gdf.merge(df_trips, on = 'shape_id',how='left')
 
 def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, limit=1000):
     # Define API endpoint and base query
