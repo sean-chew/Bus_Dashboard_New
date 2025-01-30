@@ -4,6 +4,8 @@ import urllib.request
 import json
 from urllib.parse import urlencode
 import warnings
+import geopandas as gpd
+import folium 
 warnings.filterwarnings("ignore")
 
 def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, limit=1000):
@@ -109,6 +111,24 @@ if st.sidebar.button("Fetch Data"):
                 file_name="bus_data.csv",
                 mime="text/csv"
             )
+
+            st.subheader("Map Visualization")
+            gdf_routes = gpd.read_file("gdf_join.shp")  # Replace with your actual data source
+            map_center = gdf_routes.geometry.centroid.unary_union.centroid
+            folium_map = folium.Map(location=[map_center.y, map_center.x], zoom_start=12)
+
+            # Add routes to the map as lines
+            for _, row in gdf_routes.iterrows():
+                folium.PolyLine(
+                    locations=[(lat, lon) for lon, lat in row.geometry.coords],
+                    color="blue",  # You can map this to the route_id or avg_speed if needed
+                    weight=3,
+                    opacity=0.7,
+                    popup=row['route_name']
+                ).add_to(folium_map)
+
+            # Display the map in Streamlit
+            st.write(folium_map)
         else:
             st.warning("No data found for the selected filters.")
             
