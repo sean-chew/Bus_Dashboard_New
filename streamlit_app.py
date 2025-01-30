@@ -158,7 +158,7 @@ if st.sidebar.button("Fetch Data"):
             )
 
             st.subheader("Map Visualization")
-            gdf_routes = gdf_join  # Replace with your actual data source
+            gdf_routes = gdf_join.head(10)  # Only show the first 10 routes
             map_center = gdf_routes.geometry.centroid.unary_union.centroid
             folium_map = folium.Map(location=[map_center.y, map_center.x], zoom_start=12)
 
