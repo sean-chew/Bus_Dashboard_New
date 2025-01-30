@@ -7,6 +7,7 @@ import requests
 from urllib.parse import urlencode
 import warnings
 import geopandas as gpd
+import io
 import folium 
 warnings.filterwarnings("ignore")
 # URL to the GTFS data
