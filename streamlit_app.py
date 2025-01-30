@@ -7,7 +7,6 @@ import warnings
 import folium
 from folium import plugins
 import geopandas as gpd
-import matplotlib.pyplot as plt
 warnings.filterwarnings("ignore")
 
 # Function to fetch bus route speed data
