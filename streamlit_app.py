@@ -2,11 +2,64 @@ import streamlit as st
 import pandas as pd
 import urllib.request
 import json
+import zipfile
 from urllib.parse import urlencode
 import warnings
 import geopandas as gpd
 import folium 
 warnings.filterwarnings("ignore")
+# URL to the GTFS data
+url = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_b.zip"
+
+# Function to download and extract the ZIP file from the URL
+def fetch_and_extract_gtfs(url):
+    # Download the file from the URL
+    response = requests.get(url)
+    
+    # Check if the request was successful (status code 200)
+    if response.status_code == 200:
+        # Create a BytesIO object from the response content
+        zip_file = io.BytesIO(response.content)
+        
+        # Extract the ZIP file in memory
+        with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+            # List all files in the ZIP
+            # zip_ref.printdir()
+
+            # Read 'shapes.txt' into DataFrame
+            with zip_ref.open('shapes.txt') as f_shapes:
+                df_shapes = pd.read_csv(f_shapes)
+            
+            # Read 'trips.txt' into DataFrame
+            with zip_ref.open('trips.txt') as f_trips:
+                df_trips = pd.read_csv(f_trips)
+            
+            # Return the DataFrames
+            return df_shapes, df_trips
+    else:
+        raise Exception(f"Failed to download file, status code: {response.status_code}")
+
+# Using Streamlit to display the GTFS data
+# import streamlit as st
+
+# st.title("GTFS Data Explorer")
+
+# Fetch and display stops data
+df_shapes, df_trips = fetch_and_extract_gtfs(url)
+df_trips
+
+df_shapes['shape_pt_sequence'] = pd.to_numeric(shapes['shape_pt_sequence'])
+
+# Sort data to ensure points are in correct order
+df_shapes = df_shapes.sort_values(by=['shape_id', 'shape_pt_sequence'])
+# Group by shape_id and create LineString geometry
+lines = df_shapes.groupby('shape_id').apply(
+    lambda x: sp.LineString(x[['shape_pt_lon', 'shape_pt_lat']].values)
+).reset_index(name='geometry')
+
+# # Convert to GeoDataFrame
+gdf = gpd.GeoDataFrame(lines, geometry='geometry', crs="EPSG:4326")  # WGS 84 CRS
+gdf_join = gdf.merge(trips_c, on = 'shape_id',how='left')
 
 def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, limit=1000):
     # Define API endpoint and base query
@@ -113,7 +166,7 @@ if st.sidebar.button("Fetch Data"):
             )
 
             st.subheader("Map Visualization")
-            gdf_routes = gpd.read_file("./gdf_join.shp")  # Replace with your actual data source
+            gdf_routes = gdf_join  # Replace with your actual data source
             map_center = gdf_routes.geometry.centroid.unary_union.centroid
             folium_map = folium.Map(location=[map_center.y, map_center.x], zoom_start=12)
 
