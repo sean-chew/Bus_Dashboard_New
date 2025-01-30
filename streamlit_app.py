@@ -3,6 +3,7 @@ import pandas as pd
 import urllib.request
 import json
 import zipfile
+import requests
 from urllib.parse import urlencode
 import warnings
 import geopandas as gpd
