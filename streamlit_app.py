@@ -8,9 +8,11 @@ from urllib.parse import urlencode
 import warnings
 import geopandas as gpd
 import io
-import folium 
+import folium
 import shapely as sp
+import streamlit.components.v1 as components
 warnings.filterwarnings("ignore")
+
 # URL to the GTFS data
 url = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_b.zip"
 
@@ -42,63 +44,22 @@ def fetch_and_extract_gtfs(url):
     else:
         raise Exception(f"Failed to download file, status code: {response.status_code}")
 
-# Using Streamlit to display the GTFS data
-# import streamlit as st
-
-# st.title("GTFS Data Explorer")
-
 # Fetch and display stops data
 df_shapes, df_trips = fetch_and_extract_gtfs(url)
-# df_trips
-
 df_shapes['shape_pt_sequence'] = pd.to_numeric(df_shapes['shape_pt_sequence'])
 
 # Sort data to ensure points are in correct order
 df_shapes = df_shapes.sort_values(by=['shape_id', 'shape_pt_sequence'])
 # Group by shape_id and create LineString geometry
 lines = df_shapes.groupby('shape_id').apply(
-    lambda x: sp.LineString(x[['shape_pt_lon', 'shape_pt_lat']].values)
+    lambda x: sp.geometry.LineString(x[['shape_pt_lon', 'shape_pt_lat']].values)
 ).reset_index(name='geometry')
 
 # # Convert to GeoDataFrame
 gdf = gpd.GeoDataFrame(lines, geometry='geometry', crs="EPSG:4326")  # WGS 84 CRS
-gdf_join = gdf.merge(df_trips, on = 'shape_id',how='left')
+gdf_join = gdf.merge(df_trips, on='shape_id', how='left')
 
-def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, limit=1000):
-    # Define API endpoint and base query
-    BASE_API = "https://data.ny.gov/resource/58t6-89vi.json?"
-    query_speeds = {
-        '$select': 'route_id, AVG(average_road_speed) as avg_speed',
-        '$group': 'route_id',
-        '$limit': limit,
-        '$order': 'avg_speed'
-    }
-    
-    # Build WHERE clause based on filters
-    where_conditions = []
-    
-    if route_id:
-        where_conditions.append(f'route_id="{route_id}"')
-    if borough:
-        where_conditions.append(f'borough="{borough}"')
-    if date_start:
-        where_conditions.append(f'timestamp>="{date_start}T00:00:00"')
-    if date_end:
-        where_conditions.append(f'timestamp<="{date_end}T23:59:59"')
-    
-    if where_conditions:
-        query_speeds['$where'] = ' AND '.join(where_conditions)
-    
-    # Fetch data
-    url_speeds = BASE_API + urlencode(query_speeds)
-    response_speeds = urllib.request.urlopen(url_speeds)
-    data_speeds = json.loads(response_speeds.read().decode())
-    
-    # Convert to DataFrame
-    df_speeds = pd.DataFrame(data_speeds)
-    return df_speeds
-
-# Set up the Streamlit page
+# Streamlit page setup
 st.set_page_config(page_title="NYC Bus Data Explorer", layout="wide")
 st.title("NYC Bus Data Explorer")
 
@@ -125,25 +86,21 @@ limit = st.sidebar.slider("Number of results", min_value=10, max_value=1000, val
 # Add a button to trigger the data fetch
 if st.sidebar.button("Fetch Data"):
     try:
-        # Convert dates to string format for API
-        date_start_str = date_start.strftime('%Y-%m-%d') if date_start else None
-        date_end_str = date_end.strftime('%Y-%m-%d') if date_end else None
-        
         # Fetch the data
         df = fetch_bus_data(
-            date_start=date_start_str,
-            date_end=date_end_str,
+            date_start=date_start.strftime('%Y-%m-%d') if date_start else None,
+            date_end=date_end.strftime('%Y-%m-%d') if date_end else None,
             borough=borough_filter,
             limit=limit
         )
-        
+
         # Display the results
         st.header("Results")
-        
+
         # Convert avg_speed to numeric and round to 2 decimal places
         if 'avg_speed' in df.columns:
             df['avg_speed'] = pd.to_numeric(df['avg_speed']).round(2)
-        
+
         # Display basic statistics
         if not df.empty:
             st.subheader("Summary Statistics")
@@ -154,11 +111,11 @@ if st.sidebar.button("Fetch Data"):
                 st.metric("Fastest Route", f"Route {df.loc[df['avg_speed'].idxmax(), 'route_id']}")
             with col3:
                 st.metric("Slowest Route", f"Route {df.loc[df['avg_speed'].idxmin(), 'route_id']}")
-            
+
             # Display the full dataset
             st.subheader("Detailed Data")
             st.dataframe(df)
-            
+
             # Download button for the data
             csv = df.to_csv(index=False)
             st.download_button(
@@ -174,21 +131,22 @@ if st.sidebar.button("Fetch Data"):
             folium_map = folium.Map(location=[map_center.y, map_center.x], zoom_start=12)
 
             # Add routes to the map as lines
-            # for _, row in gdf_routes.iterrows():
-            #     folium.PolyLine(
-            #         locations=[(lat, lon) for lon, lat in row.geometry.coords],
-            #         color="blue",  # You can map this to the route_id or avg_speed if needed
-            #         weight=3,
-            #         opacity=0.7
-            #     ).add_to(folium_map)
+            for _, row in gdf_routes.iterrows():
+                folium.PolyLine(
+                    locations=[(lat, lon) for lon, lat in row.geometry.coords],
+                    color="blue",  # You can map this to the route_id or avg_speed if needed
+                    weight=3,
+                    opacity=0.7
+                ).add_to(folium_map)
 
-            # Display the map in Streamlit
-            # st.write(folium_map)
+            # Display the map as HTML in Streamlit
+            folium_map_html = folium_map._repr_html_()  # Convert to HTML
+            components.html(folium_map_html, height=600)
+
         else:
             st.warning("No data found for the selected filters.")
-            
+
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 else:
     st.info("Use the filters in the sidebar and click 'Fetch Data' to load bus data.")
-
