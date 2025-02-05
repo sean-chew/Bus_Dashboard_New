@@ -68,7 +68,8 @@ def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, 
         '$select': 'route_id, AVG(average_road_speed) as avg_speed',
         '$group': 'route_id',
         '$limit': limit,
-        '$order': 'avg_speed'
+        '$order': 'avg_speed',
+        'borough': 'borough'
     }
     
     # Build WHERE clause based on filters
