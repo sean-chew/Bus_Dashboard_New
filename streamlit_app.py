@@ -11,6 +11,7 @@ import io
 import folium
 import shapely as sp
 import streamlit.components.v1 as components
+import branca.colormap as cm
 warnings.filterwarnings("ignore")
 
 # URL to the GTFS data
@@ -53,8 +54,11 @@ lines = df_shapes.groupby('shape_id').apply(
 ).reset_index(name='geometry')
 
 # # Convert to GeoDataFrame
+df_trips = df_trips[['route_id','direction_id','shape_id']]
+df_trips = df_trips.drop_duplicates().reset_index(drop = True)
 gdf = gpd.GeoDataFrame(lines, geometry='geometry', crs="EPSG:4326")  # WGS 84 CRS
 gdf_join = gdf.merge(df_trips, on='shape_id', how='left')
+
 
 # Function to fetch bus data
 def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, limit=1000):
@@ -110,7 +114,7 @@ boroughs = ["All", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
 selected_borough = st.sidebar.selectbox("Select Borough", boroughs)
 
 # Convert borough "All" to None for the API
-borough_filter = None if selected_borough == "All" else selected_borough
+borough_filter = None if selected_borough == "Brooklyn" else selected_borough
 
 # Number of results limiter
 limit = st.sidebar.slider("Number of results", min_value=10, max_value=1000, value=100, step=10)
@@ -128,7 +132,7 @@ if st.sidebar.button("Fetch Data"):
 
         # Display the results
         st.header("Results")
-
+        
         # Convert avg_speed to numeric and round to 2 decimal places
         if 'avg_speed' in df.columns:
             df['avg_speed'] = pd.to_numeric(df['avg_speed']).round(2)
@@ -158,18 +162,49 @@ if st.sidebar.button("Fetch Data"):
             )
 
             st.subheader("Map Visualization")
-            gdf_routes = gdf_join.head(10)  # Only show the first 10 routes
-            map_center = gdf_routes.geometry.centroid.unary_union.centroid
-            folium_map = folium.Map(location=[map_center.y, map_center.x], zoom_start=12)
 
-            # Add routes to the map as lines
+            df['avg_speed'] = pd.to_numeric(df['avg_speed'], errors='coerce').round(2)
+            gdf_routes = gdf_join.merge(df, how = "left", on = "route_id").dropna()
+            map_center = gdf_routes.geometry.centroid.unary_union.centroid
+            folium_map = folium.Map(location=[map_center.y, map_center.x], zoom_start=12,tiles='cartodbdark_matter' ) # Dark theme)
+
+
+            valid_speeds = gdf_routes['avg_speed'].dropna()
+            colormap = cm.linear.RdYlGn_09.scale(
+                valid_speeds.min(), 
+                valid_speeds.max()
+            )
+
             for _, row in gdf_routes.iterrows():
-                folium.PolyLine(
+                # Create HTML for popup
+                popup_html = f"""
+                <div style="font-family: Arial; padding: 5px">
+                    <b>Route ID:</b> {row['route_id']}<br>
+                    <b>Average Speed:</b> {row['avg_speed']:.2f} mph
+                </div>
+                """
+                tooltip = f"Route {row['route_id']}"
+                popup = folium.Popup(popup_html, max_width=300)
+
+                line = folium.PolyLine(
                     locations=[(lat, lon) for lon, lat in row.geometry.coords],
-                    color="blue",  # You can map this to the route_id or avg_speed if needed
+                    color=colormap(row['avg_speed']),  # You can map this to the route_id or avg_speed if needed
                     weight=3,
                     opacity=0.7
-                ).add_to(folium_map)
+                )
+
+                    # Add popup to the line
+                popup = folium.Popup(popup_html, max_width=300)
+                line.add_child(popup)
+                
+                # Add tooltip to the line
+                line.add_child(folium.Tooltip(tooltip))
+                
+                # Add the line to the map
+                line.add_to(folium_map)
+
+            colormap.add_to(folium_map)  # This adds a legend for the colors
+
 
             # Display the map as HTML in Streamlit
             folium_map_html = folium_map._repr_html_()  # Convert to HTML
