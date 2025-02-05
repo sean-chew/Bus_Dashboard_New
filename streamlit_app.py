@@ -61,15 +61,14 @@ gdf_join = gdf.merge(df_trips, on='shape_id', how='left')
 
 
 # Function to fetch bus data
-def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, limit=1000):
+def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough="brooklyn", limit=1000):
     # Define API endpoint and base query
     BASE_API = "https://data.ny.gov/resource/58t6-89vi.json?"
     query_speeds = {
         '$select': 'route_id, AVG(average_road_speed) as avg_speed',
         '$group': 'route_id',
         '$limit': limit,
-        '$order': 'avg_speed',
-        'borough': borough
+        '$order': 'avg_speed'
     }
     
     # Build WHERE clause based on filters
