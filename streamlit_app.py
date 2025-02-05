@@ -149,19 +149,6 @@ if st.sidebar.button("Fetch Data"):
             with col3:
                 st.metric("Slowest Route", f"Route {df.loc[df['avg_speed'].idxmin(), 'route_id']}")
 
-            # Display the full dataset
-            st.subheader("Detailed Data")
-            st.dataframe(df)
-
-            # Download button for the data
-            csv = df.to_csv(index=False)
-            st.download_button(
-                label="Download Data as CSV",
-                data=csv,
-                file_name="bus_data.csv",
-                mime="text/csv"
-            )
-
             st.subheader("Map Visualization")
 
             df['avg_speed'] = pd.to_numeric(df['avg_speed'], errors='coerce').round(2)
@@ -210,7 +197,18 @@ if st.sidebar.button("Fetch Data"):
             # Display the map as HTML in Streamlit
             folium_map_html = folium_map._repr_html_()  # Convert to HTML
             components.html(folium_map_html, height=600)
+            # Display the full dataset
+            st.subheader("Detailed Data")
+            st.dataframe(df)
 
+            # Download button for the data
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="Download Data as CSV",
+                data=csv,
+                file_name="bus_data.csv",
+                mime="text/csv"
+            )
         else:
             st.warning("No data found for the selected filters.")
 
