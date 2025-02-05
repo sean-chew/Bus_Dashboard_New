@@ -110,11 +110,11 @@ with col2:
     date_end = st.date_input("End Date")
 
 # Borough selector
-boroughs = ["All", "manhattan", "brooklyn", "queens", "bronx", "staten island"]
+boroughs = ["All", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
 selected_borough = st.sidebar.selectbox("Select Borough", boroughs)
 
 # Convert borough "All" to None for the API
-borough_filter = None if selected_borough == "brooklyn" else selected_borough
+borough_filter = None if selected_borough == "Brooklyn" else selected_borough
 
 # Number of results limiter
 limit = st.sidebar.slider("Number of results", min_value=10, max_value=1000, value=100, step=10)
