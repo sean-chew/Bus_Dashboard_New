@@ -132,7 +132,7 @@ boroughs = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
 borough_filter = st.sidebar.selectbox("Select Borough", boroughs)
 
 if borough_filter == "Manhattan":
-    gdf_join = gdf_b
+    gdf_join = gdf_m
 elif borough_filter == "Bronx":
     gdf_join = gdf_bx
 elif borough_filter == "Brooklyn":
