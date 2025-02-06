@@ -15,7 +15,12 @@ import branca.colormap as cm
 warnings.filterwarnings("ignore")
 
 # URL to the GTFS data
-url = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_b.zip"
+url_b = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_b.zip"
+url_bx = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_bx.zip"
+url_m = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_m.zip"
+url_q = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_q.zip"
+url_si = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_si.zip"
+url_busco = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_busco.zip"
 
 # Function to download and extract the ZIP file from the URL
 def fetch_and_extract_gtfs(url):
@@ -43,22 +48,34 @@ def fetch_and_extract_gtfs(url):
         raise Exception(f"Failed to download file, status code: {response.status_code}")
 
 # Fetch and display stops data
-df_shapes, df_trips = fetch_and_extract_gtfs(url)
-df_shapes['shape_pt_sequence'] = pd.to_numeric(df_shapes['shape_pt_sequence'])
 
-# Sort data to ensure points are in correct order
-df_shapes = df_shapes.sort_values(by=['shape_id', 'shape_pt_sequence'])
-# Group by shape_id and create LineString geometry
-lines = df_shapes.groupby('shape_id').apply(
-    lambda x: sp.geometry.LineString(x[['shape_pt_lon', 'shape_pt_lat']].values)
-).reset_index(name='geometry')
+def make_gdf(df_shapes, df_trips):
+    df_shapes['shape_pt_sequence'] = pd.to_numeric(df_shapes['shape_pt_sequence'])
+    # Sort data to ensure points are in correct order
+    df_shapes = df_shapes.sort_values(by=['shape_id', 'shape_pt_sequence'])
+    # Group by shape_id and create LineString geometry
+    lines = df_shapes.groupby('shape_id').apply(
+        lambda x: sp.geometry.LineString(x[['shape_pt_lon', 'shape_pt_lat']].values)
+    ).reset_index(name='geometry')
+    # # Convert to GeoDataFrame
+    df_trips = df_trips[['route_id','direction_id','shape_id']]
+    df_trips = df_trips.drop_duplicates().reset_index(drop = True)
+    gdf = gpd.GeoDataFrame(lines, geometry='geometry', crs="EPSG:4326")  # WGS 84 CRS
+    gdf_join = gdf.merge(df_trips, on='shape_id', how='left')
+    return gdf_join
 
-# # Convert to GeoDataFrame
-df_trips = df_trips[['route_id','direction_id','shape_id']]
-df_trips = df_trips.drop_duplicates().reset_index(drop = True)
-gdf = gpd.GeoDataFrame(lines, geometry='geometry', crs="EPSG:4326")  # WGS 84 CRS
-gdf_join = gdf.merge(df_trips, on='shape_id', how='left')
+df_shapes_b, df_trips_b = fetch_and_extract_gtfs(url_b)
+df_shapes_bx, df_trips_bx = fetch_and_extract_gtfs(url_bx)
+df_shapes_m, df_trips_m = fetch_and_extract_gtfs(url_m)
+df_shapes_q, df_trips_q = fetch_and_extract_gtfs(url_q)
+df_shapes_si, df_trips_si = fetch_and_extract_gtfs(url_si)
+# df_shapes_busco, df_trips_b = fetch_and_extract_gtfs(url_b)
 
+gdf_b = make_gdf(df_shapes_b, df_trips_b)
+gdf_bx = make_gdf(df_shapes_bx, df_trips_bx)
+gdf_m = make_gdf(df_shapes_m, df_trips_m)
+gdf_q = make_gdf(df_shapes_q, df_trips_q)
+gdf_si = make_gdf(df_shapes_si, df_trips_si)
 
 # Function to fetch bus data
 def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough="brooklyn", limit=1000):
@@ -114,8 +131,19 @@ boroughs = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
 
 borough_filter = st.sidebar.selectbox("Select Borough", boroughs)
 
-# Convert borough "All" to None for the API
-# borough_filter = None if selected_borough == "Brooklyn" else selected_borough
+if boroughs == "Manhattan":
+    gdf_join = gdf_b
+elif boroughs == "Bronx":
+    gdf_join = gdf_bx
+elif boroughs == "Brooklyn":
+    gdf_join = gdf_b
+elif boroughs == "Staten Island":
+    gdf_join = gdf_si
+elif boroughs == "Queens": 
+    gdf_join = gdf_q
+else:
+    gdf_join = gdf_m
+
 
 # Number of results limiter
 limit = st.sidebar.slider("Number of results", min_value=10, max_value=1000, value=100, step=10)
@@ -130,6 +158,7 @@ if st.sidebar.button("Fetch Data"):
             borough=borough_filter,
             limit=limit
         )
+
 
         # Display the results
         st.header("Results")
