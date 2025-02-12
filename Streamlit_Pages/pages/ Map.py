@@ -12,7 +12,29 @@ import folium
 import shapely as sp
 import streamlit.components.v1 as components
 import branca.colormap as cm
+from datetime import datetime
+
 warnings.filterwarnings("ignore")
+# Add route click interactivity
+route_click_js = """
+<script>
+function highlightRoute(routeId) {
+    // Get all polylines on the map
+    var allRoutes = document.querySelectorAll('.leaflet-interactive');
+    
+    allRoutes.forEach(route => {
+        if (route.id === routeId) {
+            // Highlight the selected route
+            route.style.strokeWidth = "6";  // Make the selected route thicker
+            route.style.strokeOpacity = "1";  // Full opacity
+        } else {
+            // Dim all other routes
+            route.style.strokeOpacity = "0.2";  // Lower opacity for others
+        }
+    });
+}
+</script>
+"""
 
 # URL to the GTFS data
 url_b = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_b.zip"
@@ -23,6 +45,7 @@ url_si = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_si.zip"
 url_busco = "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_busco.zip"
 
 # Function to download and extract the ZIP file from the URL
+@st.cache_data(show_spinner=False)
 def fetch_and_extract_gtfs(url):
     # Download the file from the URL
     response = requests.get(url)
@@ -48,7 +71,7 @@ def fetch_and_extract_gtfs(url):
         raise Exception(f"Failed to download file, status code: {response.status_code}")
 
 # Fetch and display stops data
-
+@st.cache_data(show_spinner=False)
 def make_gdf(df_shapes, df_trips):
     df_shapes['shape_pt_sequence'] = pd.to_numeric(df_shapes['shape_pt_sequence'])
     # Sort data to ensure points are in correct order
@@ -64,20 +87,24 @@ def make_gdf(df_shapes, df_trips):
     gdf_join = gdf.merge(df_trips, on='shape_id', how='left')
     return gdf_join
 
-df_shapes_b, df_trips_b = fetch_and_extract_gtfs(url_b)
-df_shapes_bx, df_trips_bx = fetch_and_extract_gtfs(url_bx)
-df_shapes_m, df_trips_m = fetch_and_extract_gtfs(url_m)
-df_shapes_q, df_trips_q = fetch_and_extract_gtfs(url_q)
-df_shapes_si, df_trips_si = fetch_and_extract_gtfs(url_si)
-# df_shapes_busco, df_trips_b = fetch_and_extract_gtfs(url_b)
-
-gdf_b = make_gdf(df_shapes_b, df_trips_b)
-gdf_bx = make_gdf(df_shapes_bx, df_trips_bx)
-gdf_m = make_gdf(df_shapes_m, df_trips_m)
-gdf_q = make_gdf(df_shapes_q, df_trips_q)
-gdf_si = make_gdf(df_shapes_si, df_trips_si)
+@st.cache_data(show_spinner=False)
+def load_all_gtfs():
+    urls = {
+        "Brooklyn": url_b,
+        "Bronx": url_bx,
+        "Manhattan": url_m,
+        "Queens": url_q,
+        "Staten Island": url_si
+    }
+    gdfs = {}
+    for borough, url in urls.items():
+        df_shapes, df_trips = fetch_and_extract_gtfs(url)
+        gdfs[borough] = make_gdf(df_shapes, df_trips)
+    
+    return gdfs
 
 # Function to fetch bus data
+@st.cache_data(show_spinner=False)
 def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough="brooklyn", limit=1000):
     # Define API endpoint and base query
     BASE_API = "https://data.ny.gov/resource/58t6-89vi.json?"
@@ -112,8 +139,30 @@ def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough="brook
     df_speeds = pd.DataFrame(data_speeds)
     return df_speeds
 
+def get_latest_data_date():
+    # Socrata Open Data API endpoint for the dataset
+    dataset_id = "58t6-89vi"
+    base_url = f"https://data.ny.gov/resource/{dataset_id}.json"
+
+    # Query parameters to get the most recent date
+    query = {
+        "$select": "MAX(timestamp) as latest_date"
+    }
+
+    # Make the request to the API
+    response = requests.get(base_url, params=query)
+
+    if response.status_code == 200:
+        data = response.json()
+        if data and 'latest_date' in data[0]:
+            # Convert the date string to a datetime object
+            latest_date = datetime.strptime(data[0]['latest_date'], '%Y-%m-%dT%H:%M:%S.%f')
+            return latest_date
+        else:
+            raise ValueError("No date information found in the dataset.")
+    else:
+        raise ConnectionError(f"Failed to fetch data: {response.status_code}")
 # Set up the Streamlit page
-st.set_page_config(page_title="NYC Bus Data Explorer", layout="wide")
 st.title("NYC Bus Data Explorer")
 
 # Sidebar controls
@@ -121,43 +170,39 @@ st.sidebar.header("Filters")
 
 # Date range selector
 col1, col2 = st.sidebar.columns(2)
-with col1:
-    date_start = st.date_input("Start Date")
-with col2:
-    date_end = st.date_input("End Date")
+
+
+try:
+    latest_date = get_latest_data_date()
+    with col1:
+        date_start = st.date_input("Start Date", max_value = latest_date)
+    with col2:
+        date_end = st.date_input("End Date", max_value=latest_date)
+except Exception as e:
+    st.error(f"Error fetching the latest data date: {e}")
 
 # Borough selector
 boroughs = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
-
 borough_filter = st.sidebar.selectbox("Select Borough", boroughs)
-
-if borough_filter == "Manhattan":
-    gdf_join = gdf_m
-elif borough_filter == "Bronx":
-    gdf_join = gdf_bx
-elif borough_filter == "Brooklyn":
-    gdf_join = gdf_b
-elif borough_filter == "Staten Island":
-    gdf_join = gdf_si
-elif borough_filter == "Queens": 
-    gdf_join = gdf_q
-else:
-    gdf_join = gdf_m
-
+gdf_data = load_all_gtfs()
+gdf_join = gdf_data[borough_filter]
 
 # Number of results limiter
-limit = st.sidebar.slider("Number of results", min_value=10, max_value=1000, value=100, step=10)
+# limit = st.sidebar.slider("Number of results", min_value=10, max_value=1000, value=100, step=10)
 
 # Add a button to trigger the data fetch
-if st.sidebar.button("Fetch Data"):
+if st.sidebar.button("Fetch Data",key="fetch_button"):
     try:
         # Fetch the data
-        df = fetch_bus_data(
-            date_start=date_start.strftime('%Y-%m-%d') if date_start else None,
-            date_end=date_end.strftime('%Y-%m-%d') if date_end else None,
-            borough=borough_filter,
-            limit=limit
-        )
+        with st.spinner("Fetching and processing data..."):
+
+            df = fetch_bus_data(
+                date_start=date_start.strftime('%Y-%m-%d') if date_start else None,
+                date_end=date_end.strftime('%Y-%m-%d') if date_end else None,
+                borough=borough_filter #,
+                # limit=limit
+            )
+        
 
 
         # Display the results
@@ -182,6 +227,7 @@ if st.sidebar.button("Fetch Data"):
 
             df['avg_speed'] = pd.to_numeric(df['avg_speed'], errors='coerce').round(2)
             gdf_routes = gdf_join.merge(df, how = "left", on = "route_id").dropna()
+            gdf_routes["geometry"] = gdf_routes["geometry"].simplify(0.0001)  # Simplifies geometries for faster rendering
             map_center = gdf_routes.geometry.centroid.unary_union.centroid
             folium_map = folium.Map(location=[map_center.y, map_center.x], zoom_start=12,tiles='cartodbdark_matter' ) # Dark theme)
 
