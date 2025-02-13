@@ -13,6 +13,7 @@ import shapely as sp
 import streamlit.components.v1 as components
 import branca.colormap as cm
 from datetime import datetime
+from shapely.ops import unary_union
 
 warnings.filterwarnings("ignore")
 # Add route click interactivity
@@ -188,7 +189,42 @@ gdf_data = load_all_gtfs()
 gdf_join = gdf_data[borough_filter]
 
 # Number of results limiter
-# limit = st.sidebar.slider("Number of results", min_value=10, max_value=1000, value=100, step=10)
+
+import json
+
+def render_mapbox_map(gdf_routes):
+    mapbox_access_token = "pk.eyJ1Ijoic2NoZXcyIiwiYSI6ImNsOWVjNmd0ZDI3Y2gzcGw5aTVnMnNoMXMifQ.uYA52Qg_9j0JJD8nO7Y64w"
+
+    # Convert route geometries to JSON format
+    route_features = []
+    for _, row in gdf_routes.iterrows():
+        feature = {
+            "type": "Feature",
+            "properties": {
+                "route_id": row["route_id"],
+                "avg_speed": row["avg_speed"]
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[lon, lat] for lon, lat in row.geometry.coords]
+            }
+        }
+        route_features.append(feature)
+
+    geojson_data = {
+        "type": "FeatureCollection",
+        "features": route_features
+    }
+
+    # Read the HTML template
+    with open("mapbox_template.html", "r", encoding="utf-8") as file:
+        html_template = file.read()
+
+    # Replace placeholders with actual data
+    html_code = html_template.replace("{mapbox_access_token}", mapbox_access_token)
+    html_code = html_code.replace("{geojson_data}", json.dumps(geojson_data))
+
+    return html_code
 
 # Add a button to trigger the data fetch
 if st.sidebar.button("Fetch Data",key="fetch_button"):
@@ -203,8 +239,6 @@ if st.sidebar.button("Fetch Data",key="fetch_button"):
                 # limit=limit
             )
         
-
-
         # Display the results
         st.header("Results")
         
@@ -229,52 +263,13 @@ if st.sidebar.button("Fetch Data",key="fetch_button"):
             gdf_routes = gdf_join.merge(df, how = "left", on = "route_id").dropna()
             gdf_routes["geometry"] = gdf_routes["geometry"].simplify(0.0001)  # Simplifies geometries for faster rendering
             map_center = gdf_routes.geometry.centroid.unary_union.centroid
-            folium_map = folium.Map(location=[map_center.y, map_center.x], zoom_start=12,tiles='cartodbdark_matter' ) # Dark theme)
-
-
-            valid_speeds = gdf_routes['avg_speed'].dropna()
-            colormap = cm.linear.RdYlGn_09.scale(
-                valid_speeds.min(), 
-                valid_speeds.max()
-            )
-
-            for _, row in gdf_routes.iterrows():
-                # Create HTML for popup
-                popup_html = f"""
-                <div style="font-family: Arial; padding: 5px">
-                    <b>Route ID:</b> {row['route_id']}<br>
-                    <b>Average Speed:</b> {row['avg_speed']:.2f} mph
-                </div>
-                """
-                tooltip = f"Route {row['route_id']}"
-                popup = folium.Popup(popup_html, max_width=300)
-
-                line = folium.PolyLine(
-                    locations=[(lat, lon) for lon, lat in row.geometry.coords],
-                    color=colormap(row['avg_speed']),  # You can map this to the route_id or avg_speed if needed
-                    weight=3,
-                    opacity=0.7
-                )
-
-                    # Add popup to the line
-                popup = folium.Popup(popup_html, max_width=300)
-                line.add_child(popup)
-                
-                # Add tooltip to the line
-                line.add_child(folium.Tooltip(tooltip))
-                
-                # Add the line to the map
-                line.add_to(folium_map)
-
-            colormap.add_to(folium_map)  # This adds a legend for the colors
-
-
-            # Display the map as HTML in Streamlit
-            folium_map_html = folium_map._repr_html_()  # Convert to HTML
-            components.html(folium_map_html, height=600)
+            if not gdf_routes.empty:
+                st.subheader("Bus Routes Map")
+                mapbox_html = render_mapbox_map(gdf_routes)
+                components.html(mapbox_html, height=600)
             # Display the full dataset
             st.subheader("Detailed Data")
-            st.dataframe(df)
+            st.dataframe(gdf_routes)
 
             # Download button for the data
             csv = df.to_csv(index=False)
