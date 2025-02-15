@@ -258,7 +258,7 @@ if st.sidebar.button("Fetch Data",key="fetch_button"):
                 st.metric("Slowest Route", f"Route {df.loc[df['avg_speed'].idxmin(), 'route_id']}")
 
             st.subheader("Map Visualization")
-            st.subheader(os.listdir(os.curdir))
+            # st.subheader(os.listdir(os.curdir))
 
 
             df['avg_speed'] = pd.to_numeric(df['avg_speed'], errors='coerce').round(2)
