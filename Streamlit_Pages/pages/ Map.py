@@ -14,6 +14,7 @@ import streamlit.components.v1 as components
 import branca.colormap as cm
 from datetime import datetime
 from shapely.ops import unary_union
+import os
 
 warnings.filterwarnings("ignore")
 # Add route click interactivity
@@ -103,7 +104,6 @@ def load_all_gtfs():
         gdfs[borough] = make_gdf(df_shapes, df_trips)
     
     return gdfs
-
 # Function to fetch bus data
 @st.cache_data(show_spinner=False)
 def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough="brooklyn", limit=1000):
@@ -258,6 +258,8 @@ if st.sidebar.button("Fetch Data",key="fetch_button"):
                 st.metric("Slowest Route", f"Route {df.loc[df['avg_speed'].idxmin(), 'route_id']}")
 
             st.subheader("Map Visualization")
+            st.subheader(os.listdir(os.curdir))
+
 
             df['avg_speed'] = pd.to_numeric(df['avg_speed'], errors='coerce').round(2)
             gdf_routes = gdf_join.merge(df, how = "left", on = "route_id").dropna()
@@ -279,6 +281,7 @@ if st.sidebar.button("Fetch Data",key="fetch_button"):
                 file_name="bus_data.csv",
                 mime="text/csv"
             )
+            
         else:
             st.warning("No data found for the selected filters.")
 
