@@ -217,7 +217,7 @@ def render_mapbox_map(gdf_routes):
     }
 
     # Read the HTML template hello
-    with open("mapbox_template.html", "r", encoding="utf-8") as file:
+    with open("./mapbox_template.html", "r", encoding="utf-8") as file:
         html_template = file.read()
 
     # Replace placeholders with actual data
