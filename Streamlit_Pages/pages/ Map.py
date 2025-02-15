@@ -216,7 +216,7 @@ def render_mapbox_map(gdf_routes):
         "features": route_features
     }
 
-    # Read the HTML template
+    # Read the HTML template hello
     with open("mapbox_template.html", "r", encoding="utf-8") as file:
         html_template = file.read()
 
