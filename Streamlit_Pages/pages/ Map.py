@@ -87,10 +87,10 @@ def make_gdf(df_shapes, df_trips):
     df_trips = df_trips.drop_duplicates().reset_index(drop = True)
     gdf = gpd.GeoDataFrame(lines, geometry='geometry', crs="EPSG:4326")  # WGS 84 CRS
     gdf_join = gdf.merge(df_trips, on='shape_id', how='left')
-    gdf_join = gdf_join\
-    .dissolve(by = ["route_id","direction_id"], aggfunc = 'first')\
-    .reset_index()\
-    .drop('shape_id',axis = 1)
+    # gdf_join = gdf_join\
+    # .dissolve(by = ["route_id","direction_id"], aggfunc = 'first')\
+    # .reset_index()\
+    # .drop('shape_id',axis = 1)
     return gdf_join
 
 @st.cache_data(show_spinner=False)
