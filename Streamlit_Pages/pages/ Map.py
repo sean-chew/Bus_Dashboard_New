@@ -217,7 +217,7 @@ def render_mapbox_map(gdf_routes):
     }
 
     # Read the HTML template hello
-    with open("./Streamlit_Pages/mapbox_template.html", "r") as file:
+    with open("mapbox_template.html", "r") as file:
         html_template = file.read()
 
     # Replace placeholders with actual data
