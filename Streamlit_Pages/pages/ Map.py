@@ -87,6 +87,10 @@ def make_gdf(df_shapes, df_trips):
     df_trips = df_trips.drop_duplicates().reset_index(drop = True)
     gdf = gpd.GeoDataFrame(lines, geometry='geometry', crs="EPSG:4326")  # WGS 84 CRS
     gdf_join = gdf.merge(df_trips, on='shape_id', how='left')
+    gdf_join = gdf_join\
+    .dissolve(by = ["route_id","direction_id"], aggfunc = 'first')\
+    .reset_index()\
+    .drop('shape_id',axis = 1)
     return gdf_join
 
 @st.cache_data(show_spinner=False)
@@ -172,7 +176,6 @@ st.sidebar.header("Filters")
 # Date range selector
 col1, col2 = st.sidebar.columns(2)
 
-
 try:
     latest_date = get_latest_data_date()
     with col1:
@@ -187,10 +190,6 @@ boroughs = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
 borough_filter = st.sidebar.selectbox("Select Borough", boroughs)
 gdf_data = load_all_gtfs()
 gdf_join = gdf_data[borough_filter]
-
-# Number of results limiter
-
-import json
 
 def render_mapbox_map(gdf_routes):
     mapbox_access_token = "pk.eyJ1Ijoic2NoZXcyIiwiYSI6ImNsOWVjNmd0ZDI3Y2gzcGw5aTVnMnNoMXMifQ.uYA52Qg_9j0JJD8nO7Y64w"
@@ -236,7 +235,6 @@ if st.sidebar.button("Fetch Data",key="fetch_button"):
                 date_start=date_start.strftime('%Y-%m-%d') if date_start else None,
                 date_end=date_end.strftime('%Y-%m-%d') if date_end else None,
                 borough=borough_filter #,
-                # limit=limit
             )
         
         # Display the results
@@ -256,10 +254,6 @@ if st.sidebar.button("Fetch Data",key="fetch_button"):
                 st.metric("Fastest Route", f"Route {df.loc[df['avg_speed'].idxmax(), 'route_id']}")
             with col3:
                 st.metric("Slowest Route", f"Route {df.loc[df['avg_speed'].idxmin(), 'route_id']}")
-
-            st.subheader("Map Visualization")
-            # st.subheader(os.listdir(os.curdir))
-
 
             df['avg_speed'] = pd.to_numeric(df['avg_speed'], errors='coerce').round(2)
             gdf_routes = gdf_join.merge(df, how = "left", on = "route_id").dropna()
