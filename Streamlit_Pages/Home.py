@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore")
 
 
 # Set up the Streamlit page
-st.set_page_config(page_title="NYC Bus Data Explorer", layout="wide", menu_items={
+st.set_page_config(page_title="NYC Bus Data Explorer", layout="wide", initial_sidebar_state="auto", menu_items={
         'Get Help': 'https://www.extremelycoolapp.com/help',
         'Report a bug': "https://www.extremelycoolapp.com/bug",
         'About': "# This is a header. This is an *extremely* cool app!"
