@@ -8,13 +8,9 @@ from urllib.parse import urlencode
 import warnings
 import geopandas as gpd
 import io
-import folium
 import shapely as sp
 import streamlit.components.v1 as components
-import branca.colormap as cm
 from datetime import datetime
-from shapely.ops import unary_union
-import os
 
 warnings.filterwarnings("ignore")
 # Add route click interactivity
@@ -83,14 +79,14 @@ def make_gdf(df_shapes, df_trips):
         lambda x: sp.geometry.LineString(x[['shape_pt_lon', 'shape_pt_lat']].values)
     ).reset_index(name='geometry')
     # # Convert to GeoDataFrame
-    df_trips = df_trips[['route_id','direction_id','shape_id']]
+    df_trips = df_trips[['route_id','trip_headsign','shape_id']]
     df_trips = df_trips.drop_duplicates().reset_index(drop = True)
     gdf = gpd.GeoDataFrame(lines, geometry='geometry', crs="EPSG:4326")  # WGS 84 CRS
-    gdf_join = gdf.merge(df_trips, on='shape_id', how='left')
-    # gdf_join = gdf_join\
-    # .dissolve(by = ["route_id","direction_id"], aggfunc = 'first')\
-    # .reset_index()\
-    # .drop('shape_id',axis = 1)
+    gdf_join = gdf.merge(df_trips, on='shape_id', how='left')\
+    .groupby(by = ["route_id","trip_headsign"])\
+    .first()\
+    .reset_index()\
+    .drop('shape_id',axis = 1)
     return gdf_join
 
 @st.cache_data(show_spinner=False)
@@ -100,7 +96,9 @@ def load_all_gtfs():
         "Bronx": url_bx,
         "Manhattan": url_m,
         "Queens": url_q,
-        "Staten Island": url_si
+        "Staten Island": url_si,
+        "busco": url_busco
+
     }
     gdfs = {}
     for borough, url in urls.items():
@@ -108,9 +106,10 @@ def load_all_gtfs():
         gdfs[borough] = make_gdf(df_shapes, df_trips)
     
     return gdfs
+
 # Function to fetch bus data
 @st.cache_data(show_spinner=False)
-def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough="brooklyn", limit=1000):
+def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, limit=1000):
     # Define API endpoint and base query
     BASE_API = "https://data.ny.gov/resource/58t6-89vi.json?"
     query_speeds = {
@@ -144,6 +143,7 @@ def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough="brook
     df_speeds = pd.DataFrame(data_speeds)
     return df_speeds
 
+@st.cache_data(show_spinner=False)
 def get_latest_data_date():
     # Socrata Open Data API endpoint for the dataset
     dataset_id = "58t6-89vi"
@@ -167,32 +167,10 @@ def get_latest_data_date():
             raise ValueError("No date information found in the dataset.")
     else:
         raise ConnectionError(f"Failed to fetch data: {response.status_code}")
-# Set up the Streamlit page
-st.title("NYC Bus Data Explorer")
 
-# Sidebar controls
-st.sidebar.header("Filters")
-
-# Date range selector
-col1, col2 = st.sidebar.columns(2)
-
-try:
-    latest_date = get_latest_data_date()
-    with col1:
-        date_start = st.date_input("Start Date", max_value = latest_date)
-    with col2:
-        date_end = st.date_input("End Date", max_value=latest_date)
-except Exception as e:
-    st.error(f"Error fetching the latest data date: {e}")
-
-# Borough selector
-boroughs = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
-borough_filter = st.sidebar.selectbox("Select Borough", boroughs)
-gdf_data = load_all_gtfs()
-gdf_join = gdf_data[borough_filter]
-
+# @st.cache_data(show_spinner=False)
 def render_mapbox_map(gdf_routes):
-    mapbox_access_token = "pk.eyJ1Ijoic2NoZXcyIiwiYSI6ImNsOWVjNmd0ZDI3Y2gzcGw5aTVnMnNoMXMifQ.uYA52Qg_9j0JJD8nO7Y64w"
+    mapbox_access_token = st.secrets["mapbox_access_token"]
 
     # Convert route geometries to JSON format
     route_features = []
@@ -201,7 +179,8 @@ def render_mapbox_map(gdf_routes):
             "type": "Feature",
             "properties": {
                 "route_id": row["route_id"],
-                "avg_speed": row["avg_speed"]
+                "avg_speed": row["avg_speed"],
+                "trip_headsign": row["trip_headsign"]
             },
             "geometry": {
                 "type": "LineString",
@@ -215,6 +194,7 @@ def render_mapbox_map(gdf_routes):
         "features": route_features
     }
 
+
     # Read the HTML template hello
     with open("mapbox_template.html", "r") as file:
         html_template = file.read()
@@ -225,6 +205,28 @@ def render_mapbox_map(gdf_routes):
 
     return html_code
 
+# Set up the Streamlit page
+st.title("NYC Bus Data Explorer")
+# Sidebar controls
+st.sidebar.header("Filters")
+# Date range selector
+col1, col2 = st.sidebar.columns(2)
+# Borough selector
+# boroughs = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
+# borough_filter = st.sidebar.selectbox("Select Borough", boroughs)
+# Load all data
+gdf_data = load_all_gtfs()
+gdf_all = pd.concat(gdf_data.values(), ignore_index=True)
+# gdf_join = gdf_data[borough_filter]#\
+        # .groupby(['route_id']).head(1)
+latest_date = get_latest_data_date()
+
+# Date Selector
+with col1:
+    date_start = st.date_input("Start Date", max_value = latest_date)
+with col2:
+    date_end = st.date_input("End Date", max_value=latest_date)
+
 # Add a button to trigger the data fetch
 if st.sidebar.button("Fetch Data",key="fetch_button"):
     try:
@@ -233,12 +235,12 @@ if st.sidebar.button("Fetch Data",key="fetch_button"):
 
             df = fetch_bus_data(
                 date_start=date_start.strftime('%Y-%m-%d') if date_start else None,
-                date_end=date_end.strftime('%Y-%m-%d') if date_end else None,
-                borough=borough_filter #,
+                date_end=date_end.strftime('%Y-%m-%d') if date_end else None#,
+                # borough=borough_filter #,
             )
         
         # Display the results
-        st.header("Results")
+        # st.header("Results")
         
         # Convert avg_speed to numeric and round to 2 decimal places
         if 'avg_speed' in df.columns:
@@ -256,7 +258,7 @@ if st.sidebar.button("Fetch Data",key="fetch_button"):
                 st.metric("Slowest Route", f"Route {df.loc[df['avg_speed'].idxmin(), 'route_id']}")
 
             df['avg_speed'] = pd.to_numeric(df['avg_speed'], errors='coerce').round(2)
-            gdf_routes = gdf_join.merge(df, how = "left", on = "route_id").dropna()
+            gdf_routes = gdf_all.merge(df, how = "left", on = "route_id").dropna() 
             gdf_routes["geometry"] = gdf_routes["geometry"].simplify(0.0001)  # Simplifies geometries for faster rendering
             map_center = gdf_routes.geometry.centroid.unary_union.centroid
             if not gdf_routes.empty:
@@ -265,7 +267,7 @@ if st.sidebar.button("Fetch Data",key="fetch_button"):
                 components.html(mapbox_html, height=600)
             # Display the full dataset
             st.subheader("Detailed Data")
-            st.dataframe(gdf_routes)
+            st.dataframe(gdf_routes.drop(["geometry"],axis =1))
 
             # Download button for the data
             csv = df.to_csv(index=False)
