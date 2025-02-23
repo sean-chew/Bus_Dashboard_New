@@ -109,7 +109,7 @@ def load_all_gtfs():
 
 # Function to fetch bus data
 @st.cache_data(show_spinner=False)
-def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, limit=1000):
+def fetch_bus_data(route_id=None, date_start=None, date_end=None, time_start=None, time_end=None, borough=None, limit=1000):
     # Define API endpoint and base query
     BASE_API = "https://data.ny.gov/resource/58t6-89vi.json?"
     query_speeds = {
@@ -127,9 +127,9 @@ def fetch_bus_data(route_id=None, date_start=None, date_end=None, borough=None, 
     if borough:
         where_conditions.append(f'borough="{borough}"')
     if date_start:
-        where_conditions.append(f'timestamp>="{date_start}T00:00:00"')
+        where_conditions.append(f'timestamp>="{date_start}T{time_start if time_start else "00:00:00"}"')
     if date_end:
-        where_conditions.append(f'timestamp<="{date_end}T23:59:59"')
+        where_conditions.append(f'timestamp<="{date_end}T{time_end if time_end else "23:59:59"}"')
     
     if where_conditions:
         query_speeds['$where'] = ' AND '.join(where_conditions)
@@ -215,6 +215,18 @@ col1, col2 = st.sidebar.columns(2)
 # boroughs = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
 # borough_filter = st.sidebar.selectbox("Select Borough", boroughs)
 # Load all data
+# Time range selector
+time_range = st.sidebar.slider(
+    "Select Time Range",
+    value=(0, 23),  # Default: 00:00 to 23:59
+    min_value=0,
+    max_value=23,
+    step=1,
+    format="%02d:00"
+)
+time_start = f"{time_range[0]:02d}:00:00"  # Start hour formatted as HH:00:00
+time_end = f"{time_range[1]:02d}:59:59"  # End hour formatted as HH:59:59
+
 gdf_data = load_all_gtfs()
 gdf_all = pd.concat(gdf_data.values(), ignore_index=True)
 # gdf_join = gdf_data[borough_filter]#\
@@ -228,17 +240,16 @@ with col2:
     date_end = st.date_input("End Date", max_value=latest_date)
 
 # Add a button to trigger the data fetch
-if st.sidebar.button("Fetch Data",key="fetch_button"):
+if st.sidebar.button("Fetch Data", key="fetch_button"):
     try:
         # Fetch the data
         with st.spinner("Fetching and processing data..."):
-
             df = fetch_bus_data(
                 date_start=date_start.strftime('%Y-%m-%d') if date_start else None,
-                date_end=date_end.strftime('%Y-%m-%d') if date_end else None#,
-                # borough=borough_filter #,
+                date_end=date_end.strftime('%Y-%m-%d') if date_end else None,
+                time_start=time_start,
+                time_end=time_end
             )
-        
         # Display the results
         # st.header("Results")
         

@@ -16,8 +16,70 @@
     </style>
 </head>
 <body>
+    <style>
+        /* Legend container */
+        .legend-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-family: Arial, sans-serif;
+            z-index: 1;
+        }
+    
+        /* Legend box */
+        .legend {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            line-height: 18px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            transition: opacity 0.3s ease-in-out;
+        }
+    
+        .legend div {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+    
+        .legend span {
+            width: 15px;
+            height: 15px;
+            margin-right: 8px;
+            display: inline-block;
+            border-radius: 3px;
+        }
+    
+        /* Toggle button */
+        .legend-toggle {
+            background: #333;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
+    
+        .legend-toggle:hover {
+            background: #555;
+        }
+    </style>
     <div id="map"></div>
-
+    <div class="legend-container">
+        <button class="legend-toggle" onclick="toggleLegend()">Hide Legend</button>
+        <div id="legend" class="legend">
+            <b>Average Speed (mph)</b>
+            <div><span style="background:#A41623"></span> ≤ 6</div>
+            <div><span style="background:#F85E00"></span> 6-7</div>
+            <div><span style="background:#FFB563"></span> 7-8</div>
+            <div><span style="background:#FFD29D"></span> 8-10</div>
+            <div><span style="background:#918450"></span> ≥ 10</div>
+        </div>
+    </div>
+    
     <script>
         mapboxgl.accessToken = '{mapbox_access_token}';
         const map = new mapboxgl.Map({
@@ -30,6 +92,19 @@
         const geojson = {geojson_data};
         let currentMarker = null;
         let currentPopup = null;
+
+        function toggleLegend() {
+            const legend = document.getElementById("legend");
+            const button = document.querySelector(".legend-toggle");
+
+            if (legend.style.display === "none") {
+                legend.style.display = "block";
+                button.textContent = "Hide Legend";
+            } else {
+                legend.style.display = "none";
+                button.textContent = "Show Legend";
+            }
+        }
 
         function fitPointsInView(points) {
             if (points.length === 0) return;
@@ -172,6 +247,7 @@
                 map.getCanvas().style.cursor = '';
             });
         });
+
     </script>
 </body>
 </html>
